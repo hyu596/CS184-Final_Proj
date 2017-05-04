@@ -1,0 +1,283 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Mesh Editor</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2017</h1>
+<h1 align="middle">Final Project: Geometry Processing</h1>
+<h2 align="middle">Jeff Yu, CS184-ady</h2>
+<h2 align="middle">Bing Bo, CS184-afd</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>In this project, the idea of our final project is chosen based on the extension of project 2: Geometry Processing. The key terms throughout the whole work can be picked as: <b>Downsampling/Simplification</b>, <b>Normal Isotropic Remeshing</b>, <b>Adaptive Isotropic Remeshing</b>, and <b>Catmull-Clark Subdivision</b>. Note that all of them would never work without the implementations of basic halfedge operations such as edge splitting, flipping and collapsing. Honestly, there were at least two weeks wasted on our former topic; originally we were striving to implement Displacement Mapping, but once we found it impossible to accomplish successfully without using OpenGl, we turned it down immediately since neither of two members in our group is familiar enough with OpenGl. Nonetheless, it's grateful of both of us to fulfill the diamond of our ideas eventually.</p>
+
+<h2 align="middle">Portfolio</h2>
+
+<h3> &bull; Downsampling / Simplification:  </h3>
+
+<p style="margin-left: 3em;">In general, in order to achieve <b>Simplification</b>, the edges are chosen to collapse based on the quartic errors. As shown already in reference <a href="#R1">[1]</a>, we firstly compute quadric error matrics for all the vertices based on the normal vector at each vertices. Then the quadric error matrix of an edge can be interpreted as the sum of its two endpoints' quadric error matrics, and the cost associated with the edge would be calculated from its quadric error matrix and the optimal point lying on this edge that minimizes quadric error. After appraising all edges' quadric errors, the edge with lowest cost would be considered as the cheapest edge to collapse. In the meanwhile, the edge cost updating is also necessary here. Until a target number of meshes is reached, we repeat doing the same collapsing and updating procedures.</p>
+
+<p style="margin-left: 3em;">As suggested in the reference, priority queue is adopted in our implementation to utilize the collapsing phase efficiency-wise. Regarding to quadric error updating, it took us awhile to think it through: the raw idea is to modify all the remaining edges that are related from edge collapsing. The selected way to achieve that in our implementation is that before collapsing an edge, we remove all the incident edges of its two end points from priority queue. And after the collapsing has been done, we firstly update the quadric error of the vertex created from collapsing, and its quadric error equals to the collapsed edge. Furthermore, new quadric errors of all incident edges of that vertex can be easily computed and inserted back to our priority queue.</p>
+
+<p>Here are the result of <b>Downsamlping</b>:</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/2.png" align="middle" width="400px"/>
+      </td>
+      <td>
+        <img src="images/3.png" align="middle" width="400px"/>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="images/4.png" align="middle" width="400px"/>
+      </td>
+      <td>
+        <img src="images/5.png" align="middle" width="400px"/>
+      </td>
+    </tr>
+    <tr>
+        <img src="images/1.png" align="middle" width="400px"/>
+        <figcaption align="middle">original (beast.dae)</figcaption>
+    </tr> 
+ </table>
+</div>
+
+<br>
+<h3> &bull; Remeshing:  </h3>
+
+<p style="margin-left: 3em;">The core idea of <b>Resampling</b> is relatively straightforward, and there are four steps that we repeat doing: </p>
+
+	<ol style="margin-left: 5em;">  
+	 <li>split edges that are too long</li>  
+	 <li>collapse edges that are too short</li>  
+	 <li>Flip edges that would reduce the total deviation from regular degree</li>  
+	 <li>Average all the vertices</li>  
+	</ol>  
+	
+<p style="margin-left: 3em;">We compute the mean edge length first, and define (<sup>4</sup>&frasl;<sub>5</sub> * mean) and (<sup>4</sup>&frasl;<sub>3</sub> * mean) as the length metrics that give us the edges that need to be modified for the first two steps. Moreover, the total deviation can be derived from the equation:</p>
+
+<p align="center"><i>|a1-6| + |a2-6| + |b1-6| + |b2-6|</i></p>
+
+<p style="margin-left: 3em;">where a1, a2 are the degrees of an potential edge to flip, and b1, b2 are the two vertices degrees across from this edge. There are two deviations to compute; one stands for "before flip" while another represents the deviation "after flip". If deviation decreases, then this edge is selected to be flipped. Lastly, the fourth step mentioned above is aimed to located each vertices at the center of its neighbors. However, if the vertices' positions are assigned to their corresponding new positions directly, our meshes and shading would get unstable most likely and we might lose C2 continuity. Therefore, as suggested in reference <a href="#R2">[2]</a>, we computed a tangent direct for each vertices based on its normal vector and raw direction vector. Besides that, we should only push each vertices along its tangent direction by a small factor; in our implementation, we chose it as 0.2 since we repeat each procedures for 5 times.</p>
+
+<p style="margin-left: 3em;">Note that, for the first 3 steps, we decided to find all the edges that need modification before performing actual operations. The reason for that is, if we perform the operations during detecting phase, the detection of those edges that have not been detected yet might be affected. Also, since we would repeat the same procedure over and over again, those uncorrected edges can just be left for the next iteration. Furthermore, the second step is a special case; collapsing one edge might cause those edges that are marked as "to be collapsed" not need collapsion anymore. Therefore, we decided to not to collapse any incident edges of the vertex created from collapsing.</p>
+
+<p style="margin-left: 3em;">Even though all the implementation of <b>Remeshing</b> has beem completed, we were still stuck here for awhile. The cause of that is we had not taken care of some edges cases:</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/6.png" align="middle" width="400px"/>
+      </td>
+      <td>
+        <img src="images/7.png" align="middle" width="400px"/>
+      </td>
+    </tr>
+ </table>
+</div>
+
+<p style="margin-left: 3em;">For the examples above, we should never flip the edges marked in red. And also, we need to detect the situation in which the manifold property might be violated. </p>
+
+<div align="center">
+    <table style="width=100%">
+        <tr>
+            <td align="middle">
+            <img src="images/8.png" width="480px" />
+            <figcaption align="middle">the case that violates the manifold property</figcaption>
+        </tr>
+    </table>
+</div>
+
+<p style="margin-left: 3em;">And here are the final results of our <b>Resampling</b>: </p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/9.png" align="middle" width="400px"/>
+            <figcaption align="middle">Before</figcaption>
+      </td>
+      <td>
+        <img src="images/10.png" align="middle" width="400px"/>
+            <figcaption align="middle">After</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+
+<br>
+<h3> &bull; Adaptive Anisotropic Remeshing:  </h3>
+
+<p style="margin-left: 3em;">The only thing we implemented that is out of class scope is <b>Adaptive Anisotropic Remeshing</b> (reference <a href="#R3">[3]</a>), and the reason why we chose to implement this is it works really well for the sharp features. In specific, there are two main changes that differ this remeshing technique from <b>Normal Anisotropic Remeshing</b>:</p>
+
+	<ol style="margin-left: 5em;">  
+	 <li>Instead of using the mean edge length to determine whether an edge needs modification, we compute the optimal local edge length for each edges that based on its curvature. In more details, the new metric here is also called sizing field. Similar with quadric errors from Simplification, we compute the sizing field for each vertices first which can be derived from its mean curvature and Gaussian curvature. More mathematical details can be found in the paper attached below. Then the optimal local edge would be assigned to the minimum of the sizing field of its both endpoints.</li>  
+	 <br>
+	 <li>Instead of using the centroid for vertex averaging, for each vertices, we compute the average of the barycenter at the incident triangles, weighted by the triangle area and the sizing field at each barycenters (which equals to the average of the sizing field of the triangle vertices).</li>  
+	</ol>  
+	
+<p style="margin-left: 3em;">Since we are adjusting edges and vertices based on their curvatures, our meshes after <b>Adaptive Anisotropic Remeshing</b> preserves more geometry details, which is the reason why we have these shape features shaper!</p>
+
+<p style="margin-left: 3em;">Here are some examples of our work:</p>
+
+<div align="center">
+    <table style="width=100%">
+        <tr>
+            <td align="middle">
+            <img src="images/11.png" width="480px" />
+            <figcaption align="middle">Original</figcaption>
+        </tr>
+    </table>
+</div>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/12.png" align="middle" width="400px"/>
+            <figcaption align="middle">Normal Isotropic Remeshing</figcaption>
+      </td>
+      <td>
+        <img src="images/13.png" align="middle" width="400px"/>
+            <figcaption align="middle">Adaptive Isotropic Remeshing</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+<p style="margin-left: 3em;">As you can see, both remeshing techniques reduce the messiness pretty well overall. But the differences between them are not quite clear. Let's zoom in more:</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/14.png" align="middle" width="400px"/>
+            <figcaption align="middle">Normal Isotropic Remeshing</figcaption>
+      </td>
+      <td>
+        <img src="images/15.png" align="middle" width="400px"/>
+            <figcaption align="middle">Adaptive Isotropic Remeshing</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/16.png" align="middle" width="400px"/>
+            <figcaption align="middle">Normal Isotropic Remeshing</figcaption>
+      </td>
+      <td>
+        <img src="images/17.png" align="middle" width="400px"/>
+            <figcaption align="middle">Adaptive Isotropic Remeshing</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+<p style="margin-left: 3em;">Now it should seem clearer now. We notice that, the more curve the surface is, the more dense meshes lying on this surface are, which is quite reasonable since we do not need many meshes to fully describe a surface that has already been smooth. </p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/18.png" align="middle" width="400px"/>
+            <figcaption align="middle">Normal Isotropic Remeshing</figcaption>
+      </td>
+      <td>
+        <img src="images/19.png" align="middle" width="400px"/>
+            <figcaption align="middle">Adaptive Isotropic Remeshing</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+<p style="margin-left: 3em;">In the shading more, it's more obvious that the one on the right has more details than the one on the left.</p>
+
+<br>
+<h3> &bull; Catmull-Clark Subdivision:  </h3>
+
+<p style="margin-left: 3em;"><b>Catmull-clark Subdivision</b> is a widely-used algorithm to subdivide quad meshes and to smoothen geometry. In general, we are basically following the instructions from lecture slides. But the hardest part to implement it is that if we are to partition one face, how can we detect whether its neighbor face has already been partitioned or not? If that's the case, then there must be at least one edge that has already been separated, and if we ignore that and still keep adding midpoints to each edges, we would be in trouble.</p>
+
+<p style="margin-left: 3em;">So, in order to solve that, we partition all the faces together instead of partitioning each faces one by one. To be more specific, we firstly iterate through all the edges and add midpoints to all of them, and then iterate through all the faces and start partitioning.</p>
+
+<p style="margin-left: 3em;">Below are the results of our <b>Catmull-Clark Subdivision</b>:</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/sub1.png" align="middle" width="400px"/>
+            <figcaption align="middle">Original Cube</figcaption>
+      </td>
+      <td>
+        <img src="images/sub2.png" align="middle" width="400px"/>
+            <figcaption align="middle">Cube after one subdivision</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/sub3.png" align="middle" width="400px"/>
+            <figcaption align="middle">Cube after two subdivisions</figcaption>
+      </td>
+      <td>
+        <img src="images/sub4.png" align="middle" width="400px"/>
+            <figcaption align="middle">Cube after three subdivisions</figcaption>
+      </td>
+    </tr>
+ </table>
+</div>
+
+
+<h2 align="middle">References</h2>
+
+<p id="R1"> <a href="http://www.cs.cmu.edu/~./garland/Papers/quadrics.pdf"> [1]</a> Michael Garland, Paul S. Heckbert. Surface Simplification Using Quadric Error Metrics.</p>
+
+<p id="R2"> <a href="http://graphics.uni-bielefeld.de/publications/sgp04.pdf"> [2]</a> Mario Botsch, Leif Kobbelt. A Remeshing Approach to Multiresolution Modeling.</p>
+
+<p id="R3"> <a href="http://graphics.uni-bielefeld.de/publications/eg13-remeshing.pdf"> [2]</a> Marion Dunyach1, David Vanderhaeghe, Loïc Barthe, Mario Botsch. Adaptive Remeshing for Real-Time Mesh Deformation.</p>
+
+<h2 align="middle">Project Video</h2>
+        
+<iframe width="960" height="720" src="https://www.youtube.com/embed/8fnKnaqGaIE" frameborder="0" allowfullscreen></iframe>
+
+</body>
+</html>
