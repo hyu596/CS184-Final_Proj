@@ -43,7 +43,7 @@
 
 <p style="margin-left: 3em;">As suggested in the reference, priority queue is adopted in our implementation to utilize the collapsing phase efficiency-wise. Regarding to quadric error updating, it took us awhile to think it through: the raw idea is to modify all the remaining edges that are related from edge collapsing. The selected way to achieve that in our implementation is that before collapsing an edge, we remove all the incident edges of its two end points from priority queue. And after the collapsing has been done, we firstly update the quadric error of the vertex created from collapsing, and its quadric error equals to the collapsed edge. Furthermore, new quadric errors of all incident edges of that vertex can be easily computed and inserted back to our priority queue.</p>
 
-<p>Here are the result of <b>Downsamlping</b>:</p>
+<p style="margin-left: 3em;">Here are the result of <b>Downsamlping</b>:</p>
 
 <div align="middle">
   <table style="width=100%">
@@ -222,10 +222,19 @@
             <figcaption align="middle">Adaptive Isotropic Remeshing</figcaption>
       </td>
     </tr>
- </table>
+    <tr>
+      <td>
+        <img src="images/20.png" align="middle" width="400px"/>
+            <figcaption align="middle">Normal Isotropic Remeshing</figcaption>
+      </td>
+      <td>
+        <img src="images/21.png" align="middle" width="400px"/>
+            <figcaption align="middle">Adaptive Isotropic Remeshing</figcaption>
+      </td>
+    </tr> </table>
 </div>
 
-<p style="margin-left: 3em;">In the shading more, it's more obvious that the one on the right has more details than the one on the left.</p>
+<p style="margin-left: 3em;">In the shading mode, it's more obvious that the one on the right has more details than the one on the left.</p>
 
 <br>
 <h3> &bull; Catmull-Clark Subdivision:  </h3>
